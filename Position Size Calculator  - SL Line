@@ -1,0 +1,108 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Vinay Pandey
+
+//@version=5
+indicator("Position Size Calculator", overlay = true)
+selectedOption = input.string(title="Select Mode", defval="LOD SL", options=["LOD SL", "Manual SL", "Manual SL %", "SL Line"])
+
+// INPUT
+var string gp1 = "════════════════ Position Size ════════════════"
+ 
+AccountSize = input(title="Account Size", defval=1000000, group = gp1)
+AccountRisk = input.float(title="Account Risk %", defval=0.25, group = gp1)
+Brokerage = input.float(title="Brokerage Charges %", defval=0.12, group = gp1)
+
+
+var string gp2 = "════════════════ Manual SL ══════════════════"
+Stoploss = input.float(title="Stop Loss - Enter price ", defval=200, group = gp2)
+
+var string gp3 = "═══════════════ Manual SL in  % ════════════════"
+AccountRiskSL = input.float(title="Stop Loss in %", defval=2, group = gp3)
+
+var string gp4 = "═══════════════ SL Line ════════════════"
+SL_Line = input.price(400, title = "Stop Loss",inline="Point", confirm = true, group=gp4)
+plot(SL_Line)
+
+StoplossPer = math.abs(close - (AccountRiskSL/100)*close)
+
+float Lod_sl = switch selectedOption
+    "LOD SL" => low
+    "Manual SL" => Stoploss
+    "Manual SL %" => StoplossPer
+    "SL Line" => SL_Line
+
+    =>
+        runtime.error("No matching mode type found.")
+        float(na)
+
+
+// VARIABLE
+riskLod_sl = close - Lod_sl
+percentLod_sl = math.abs((riskLod_sl / close) * 100)
+RiI = (1-(Lod_sl/(1+Brokerage/100)/(close*(1+Brokerage/100))))*100
+
+sharesLod_sl = math.round((AccountSize * AccountRisk/RiI) / close)
+
+// TABLE
+var string Layout = 'Display'
+string  tableSize = input.string("normal", "Table Size", inline = "22", options = ["huge", "large", "normal", "small", "tiny"], group = Layout)
+string  tableY = input.string("bottom", "Position ", inline = "22", options = ["top", "middle", "bottom"], group = Layout)
+string  tableX = input.string("center", "", inline = "22", options = ["left", "center", "right"], group = Layout)
+
+var table sizeDisplay1 = table.new(tableY + "_" + tableX, columns =  9, rows = 2, border_width = 1, border_color = color.new(#999999, 50) , frame_width = 1, frame_color = color.new(#999999, 50) )
+
+RonCaptial = math.abs(AccountRisk)
+InvPTrade = math.round(sharesLod_sl*close)
+Alloc = math.abs(InvPTrade/AccountSize*100)
+Risk = math.round(AccountRisk*AccountSize/100)
+
+formatNumber(num,format) =>
+    var string formattedNum=na
+    if format=='Indian'
+        if num >= 10000000
+            formattedNum := str.tostring(math.round(num/10000000, 2)) + " Cr"
+        else if num >= 100000
+            formattedNum := str.tostring(math.round(num/100000, 2)) + " Lac"
+        else if num >= 1000
+            formattedNum := str.tostring(math.round(num/1000, 2)) + " K"
+        else
+            formattedNum := str.tostring(num)
+
+    // Add commas to the formatted number
+    commaFormattedNum = ""
+    numStr = str.tostring(formattedNum)
+    for i = 0 to (str.length(formattedNum) - 1)
+        commaFormattedNum := commaFormattedNum + str.substring(numStr, i, i + 1)
+
+    commaFormattedNum
+
+number = InvPTrade
+formattedNumber_InvPTrade = formatNumber(number, "Indian")
+
+//INRFromat_InvPTrade = formatNumber(InvPTrade,"Indian")
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 0, row = 0, text = "LOD/SL", text_color = #1f0cef, bgcolor = #ffffff)
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 0, row = 1, text = str.tostring(Lod_sl, "#.##"), text_color = #363a45, bgcolor = color.white)
+    
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 1, row = 0, text = "Close/Entry", text_color = #1f0cef, bgcolor = #ffffff)
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 1, row = 1, text = str.tostring(close, "#.##"), text_color = #363a45, bgcolor = color.white)
+
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 2, row = 0, text = "Risk On Investment %", text_color = #1f0cef, bgcolor = #ffffff)
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 2, row = 1, text = str.tostring(RiI, "#.##"), text_color = #363a45, bgcolor = color.white)
+
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 3, row = 0, text = "SL %", text_color = #1f0cef, bgcolor = #ffffff)
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 3, row = 1, text = str.tostring(percentLod_sl, "#.##"), text_color = color.black, bgcolor = color.white)
+    
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 4, row = 0, text = "Risk on Captial %", text_color = #1f0cef, bgcolor = #ffffff)
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 4, row = 1, text = str.tostring(RonCaptial, "#.##"), text_color = color.black, bgcolor = color.white)
+
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 5, row = 0, text = "No of Shares", text_color = #1f0cef, bgcolor = #ecfbab)
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 5, row = 1, text = str.tostring(sharesLod_sl), text_color = color.black, bgcolor = color.white)
+    
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 6, row = 0, text = "Investment Per Trade", text_color = #1f0cef, bgcolor = #ffffff)
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 6, row = 1, text = str.tostring(formattedNumber_InvPTrade), text_color = color.black, bgcolor = color.white)
+
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 7, row = 0, text = "Allocation %", text_color = #1f0cef, bgcolor = #ffffff)
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 7, row = 1, text = str.tostring(Alloc, "#.##"), text_color = color.black, bgcolor = color.white)
+
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 8, row = 0, text = "Risk $", text_color = #1f0cef, bgcolor = #ffffff)
+table.cell(table_id = sizeDisplay1, text_size = tableSize, column = 8, row = 1, text = str.tostring(Risk, "#.##"), text_color = color.black, bgcolor = color.white)
